@@ -5,3 +5,5 @@ python-telegram-bot
 redis
 hiredis
 celery
+selenium
+bs4

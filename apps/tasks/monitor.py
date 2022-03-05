@@ -1,3 +1,5 @@
+from dataclasses import asdict
+
 from django.utils import timezone
 
 from apps.monitor.models import ATM, ATMHistoryInfo, ATMLastInfo
@@ -10,8 +12,7 @@ from tinkoff.celery import app
 def grab_info(atm_id: int):
     atm = ATM.objects.get(id=atm_id)
     info = get_info(atm.lat, atm.lon)
-    # TODO
-    if info != atm.last_info:
-        ATMLastInfo.objects.filter(atm_id=atm_id).update(**info, updated_at=timezone.now())
-        ATMHistoryInfo.objects.create(atm_id=atm_id, **info)
+    if info.rub != atm.last_info.rub or info.usd != atm.last_info.usd or info.eur != atm.last_info.eur:
+        ATMLastInfo.objects.filter(atm_id=atm_id).update(**asdict(info), updated_at=timezone.now())
+        ATMHistoryInfo.objects.create(atm_id=atm_id, **asdict(info))
         send_atm_info(atm.id)

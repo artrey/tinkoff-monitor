@@ -27,12 +27,17 @@ def send_message(text: str, telegram_user_id: str, *args, **kwargs):
 def send_atm_info(atm_id: int):
     atm = ATM.objects.get(id=atm_id)
 
-    ids = atm.subscribers.values_list("id", flat=True)
+    ids = atm.subscribers.filter(has_subscription=True).values_list("id", flat=True)
     if not ids:
         return
 
-    # TODO
-    message = str(atm.last_info.usd)
+    message = f"""
+*{atm.address}*
+
+*RUB:* {atm.last_info.rub}
+*USD:* {atm.last_info.usd}
+*EUR:* {atm.last_info.eur}
+    """
 
     for tid in ids:
         send_message(message, tid, parse_mode="markdown")
