@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.db.models import Count
 
 from apps.monitor.models import ATM, ATMHistoryInfo, ATMLastInfo
 
@@ -19,10 +20,14 @@ class ATMHistoryInfoInline(admin.TabularInline):
 
 @admin.register(ATM)
 class ATMAdmin(admin.ModelAdmin):
-    list_display = ["id", "address", "rub", "usd", "eur", "updated_at"]
+    list_display = ["id", "address", "rub", "usd", "eur", "updated_at", "subscribers_count"]
     list_display_links = ["id", "address"]
     list_select_related = ["last_info"]
     inlines = [ATMLastInfoInline, ATMHistoryInfoInline]
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.annotate(subscribers_count=Count("subscribers"))
 
     @admin.display(description="rub", ordering="last_info__rub")
     def rub(self, obj: ATM):
@@ -39,6 +44,10 @@ class ATMAdmin(admin.ModelAdmin):
     @admin.display(description="updated_at", ordering="last_info__updated_at")
     def updated_at(self, obj: ATM):
         return obj.last_info.updated_at
+
+    @admin.display(description="subscribers", ordering="subscribers_count")
+    def subscribers_count(self, obj: ATM):
+        return obj.subscribers_count
 
 
 @admin.register(ATMHistoryInfo)

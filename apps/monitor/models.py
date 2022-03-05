@@ -1,4 +1,8 @@
+from typing import Type
+
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 
 class ATM(models.Model):
@@ -37,3 +41,10 @@ class ATMHistoryInfo(MoneyMixin, models.Model):
 
     def __str__(self) -> str:
         return str(self.created_at)
+
+
+@receiver(post_save, sender=ATM, dispatch_uid="create_atm_last_info")
+def create_atm_last_info(sender: Type[ATM], instance: ATM, created: bool, **kwargs):
+    if not created:
+        return
+    ATMLastInfo.objects.create(atm=instance)
