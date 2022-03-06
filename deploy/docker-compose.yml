@@ -27,7 +27,7 @@ services:
       - private
 
   backend:
-    image: artrey/tinkoff-backend:latest
+    image: ghcr.io/artrey/tinkoff-monitor:latest
     restart: unless-stopped
     env_file:
       - .env
@@ -41,7 +41,7 @@ services:
       - private
 
   celery:
-    image: artrey/tinkoff-backend:latest
+    image: ghcr.io/artrey/tinkoff-monitor:latest
     restart: unless-stopped
     env_file:
       - .env
@@ -56,7 +56,7 @@ services:
     command: "celery -A tinkoff worker --loglevel error --pool=solo"
 
 #  beat:
-#    image: ${BACKEND_IMAGE_NAME}
+#    image: ghcr.io/artrey/tinkoff-monitor:latest
 #    restart: unless-stopped
 #    env_file:
 #      - .env
@@ -68,7 +68,7 @@ services:
 #    command: "celery -A tinkoff beat"
 
 #  bot:
-#    image: ${BACKEND_IMAGE_NAME}
+#    image: ghcr.io/artrey/tinkoff-monitor:latest
 #    restart: unless-stopped
 #    env_file:
 #      - .env

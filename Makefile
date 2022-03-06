@@ -1,4 +1,4 @@
-IMAGE_NAME:=artrey/tinkoff-backend:latest
+IMAGE_NAME:=ghcr.io/artrey/tinkoff-monitor:latest
 TIME_MARK:=$(shell date +%FT%H-%M)
 
 dumpdb:
