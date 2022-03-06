@@ -5,5 +5,8 @@ python-telegram-bot
 redis
 hiredis
 celery
+
+# scrapper
 selenium
 bs4
+opencv-python

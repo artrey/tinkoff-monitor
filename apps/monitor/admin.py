@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.db.models import Count
 
 from apps.monitor.models import ATM, ATMHistoryInfo, ATMLastInfo
+from apps.tgbot.models import NotifySettings
 
 
 class ATMLastInfoInline(admin.StackedInline):
@@ -18,12 +19,18 @@ class ATMHistoryInfoInline(admin.TabularInline):
         return False
 
 
+class NotifySettingsInline(admin.TabularInline):
+    model = NotifySettings
+    extra = 0
+
+
 @admin.register(ATM)
 class ATMAdmin(admin.ModelAdmin):
     list_display = ["id", "address", "rub", "usd", "eur", "updated_at", "subscribers_count"]
     list_display_links = ["id", "address"]
     list_select_related = ["last_info"]
-    inlines = [ATMLastInfoInline, ATMHistoryInfoInline]
+    search_fields = ["address"]
+    inlines = [ATMLastInfoInline, NotifySettingsInline, ATMHistoryInfoInline]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -41,7 +48,7 @@ class ATMAdmin(admin.ModelAdmin):
     def eur(self, obj: ATM):
         return obj.last_info.eur
 
-    @admin.display(description="updated_at", ordering="last_info__updated_at")
+    @admin.display(description="updated at", ordering="last_info__updated_at")
     def updated_at(self, obj: ATM):
         return obj.last_info.updated_at
 

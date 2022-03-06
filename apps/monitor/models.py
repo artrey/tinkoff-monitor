@@ -3,6 +3,7 @@ from typing import Type
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 
 class ATM(models.Model):
@@ -10,6 +11,10 @@ class ATM(models.Model):
     worktime = models.CharField(max_length=256)
     lon = models.DecimalField(max_digits=18, decimal_places=15)
     lat = models.DecimalField(max_digits=18, decimal_places=15)
+
+    def update_currencies(self, rub: int, usd: int, eur: int):
+        ATMLastInfo.objects.filter(atm_id=self.id).update(rub=rub, usd=usd, eur=eur, updated_at=timezone.now())
+        ATMHistoryInfo.objects.create(atm_id=self.id, rub=rub, usd=usd, eur=eur)
 
     def __str__(self) -> str:
         return f"{self.id} | {self.address}"

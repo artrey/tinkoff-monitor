@@ -15,7 +15,7 @@ class JSONEncoder(json.JSONEncoder):
     decimal types, generators and other basic python objects.
     """
 
-    def default(self, obj):
+    def default(self, obj):  # noqa: C901
         # For Date Time string spec, see ECMA 262
         # https://ecma-international.org/ecma-262/5.1/#sec-15.9.1.15
         if isinstance(obj, Promise):
