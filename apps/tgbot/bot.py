@@ -1,8 +1,10 @@
+import decimal
 import functools
 import logging
-import re
 
 from django.conf import settings
+from django.db.models import F
+from django.db.models.functions import Cos, Power, Sqrt
 from django.urls import reverse
 from telegram import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
 from telegram.ext import CallbackContext, CommandHandler, ConversationHandler, Filters, MessageHandler, Updater
@@ -40,12 +42,7 @@ def help_command(update: Update, context: CallbackContext):
         "Ты выбираешь банкоматы, до которых можешь быстро добраться, а я первым сообщу тебе"
         " когда в них появятся деньги. Выбирай банкоматы поближе,"
         " иначе можно не успеть забрать валюту 😱\n\n"
-        "За свои услуги я возьму с тебя 100 рублей. Плати один раз - пользуйся всегда 😉",
-        reply_markup=ReplyKeyboardMarkup(
-            [[KeyboardButton("Банкоматы"), KeyboardButton("Оплата")]],
-            resize_keyboard=True,
-            one_time_keyboard=True,
-        ),
+        "За свои услуги я возьму с тебя 100 рублей. Плати один раз - пользуйся всегда 😉"
     )
 
 
@@ -64,91 +61,20 @@ def payment_handler(update: Update, context: CallbackContext, user: TelegramUser
         )
 
 
-ATM_COMMAND, ATM_ADD, ATM_CONFIGURE, ATM_CONFIGURE_FINISH, ATM_REMOVE, ATM_REMOVE_ALL = range(6)
-ATM_COMMANDS_TEXT = {
-    ATM_ADD: "Добавить/изменить банкомат",
-    # ATM_CONFIGURE: "Настроить банкомат",
-    # ATM_REMOVE: "Удалить банкомат",
-    ATM_REMOVE_ALL: "Отписаться от всех уведомлений",
-}
-ATM_TEXT_COMMAND = {v: k for k, v in ATM_COMMANDS_TEXT.items()}
+def fallback_exit_handler(update: Update, context: CallbackContext):
+    update.effective_message.reply_text(text="Что-то не получилось... Попробуйте повторить с начала")
+    return ConversationHandler.END
+
+
+CURRENCY_SAVE = range(1)
 
 
 @inject_user
-def atm_start_handler(update: Update, context: CallbackContext, user: TelegramUser):
-    choices = ReplyKeyboardMarkup(
-        [
-            [KeyboardButton(ATM_COMMANDS_TEXT[ATM_ADD])],
-            [KeyboardButton(ATM_COMMANDS_TEXT[ATM_REMOVE_ALL])],
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=True,
-    )
+def currency_handler(update: Update, context: CallbackContext, user: TelegramUser):
+    if not user.notify_settings.exists():
+        update.effective_message.reply_text(text="Сначала надо настроить мониторинг")
+        return ConversationHandler.END
 
-    update.effective_message.reply_text(
-        text="Что требуется сделать?",
-        reply_markup=choices,
-    )
-
-    return ATM_COMMAND
-
-
-@inject_user
-def atm_command_handler(update: Update, context: CallbackContext, user: TelegramUser):
-    command = ATM_TEXT_COMMAND.get(update.effective_message.text)
-    if not command:
-        return atm_start_handler(update, context)
-
-    message = {
-        ATM_ADD: dict(
-            text="По какому адресу интересует банкомат? Мне будет проще понять тебя, если ты введешь адрес"
-            " (или его часть) как на официальной карте Тинькофф: https://www.tinkoff.ru/maps/atm/",
-            reply_markup=ReplyKeyboardRemove(),
-        ),
-        # ATM_CONFIGURE: "ATM_CONFIGURE",
-        # ATM_REMOVE: "ATM_REMOVE",
-        ATM_REMOVE_ALL: dict(
-            text="Точно хочешь отписаться от всех уведомлений?",
-            reply_markup=ReplyKeyboardMarkup(
-                [["Да", "Нет"]],
-                resize_keyboard=True,
-                one_time_keyboard=True,
-            ),
-        ),
-    }[command]
-    update.effective_message.reply_text(**message)
-    return command
-
-
-@inject_user
-def atm_add_handler(update: Update, context: CallbackContext, user: TelegramUser):
-    atms = ATM.objects.filter(address__icontains=update.effective_message.text).values_list("address", flat=True)[:5]
-
-    if not atms:
-        update.effective_message.reply_text(text="Ничего похожего не нахожу... Может другой адрес?")
-        return atm_command_handler(update, context)
-
-    choices = ReplyKeyboardMarkup(
-        [[KeyboardButton(atm)] for atm in atms],
-        resize_keyboard=True,
-        one_time_keyboard=True,
-    )
-
-    update.effective_message.reply_text(
-        text="Что-то из этого?",
-        reply_markup=choices,
-    )
-
-    return ATM_CONFIGURE
-
-
-@inject_user
-def atm_configure_handler(update: Update, context: CallbackContext, user: TelegramUser):
-    atm = ATM.objects.filter(address=update.effective_message.text).first()
-    if not atm:
-        return atm_command_handler(update, context)
-
-    context.chat_data["atm"] = atm.id
     choices = ReplyKeyboardMarkup(
         [
             ["рубли ₽", "доллары $", "евро €"],
@@ -157,58 +83,102 @@ def atm_configure_handler(update: Update, context: CallbackContext, user: Telegr
         resize_keyboard=True,
         one_time_keyboard=True,
     )
-
     update.effective_message.reply_text(
         text="Какая валюта интересует?",
         reply_markup=choices,
     )
-
-    return ATM_CONFIGURE_FINISH
+    return CURRENCY_SAVE
 
 
 @inject_user
-def atm_configure_finish_handler(update: Update, context: CallbackContext, user: TelegramUser):
-    atm = ATM.objects.filter(id=context.chat_data["atm"]).first()
-    if not atm:
-        update.effective_message.reply_text(text="Что-то сломалось... Надо начать сначала")
-        return atm_command_handler(update, context)
-
+def currency_finish_handler(update: Update, context: CallbackContext, user: TelegramUser):
     need_rub = "₽" in update.effective_message.text
     need_usd = "$" in update.effective_message.text
     need_eur = "€" in update.effective_message.text
+    user.notify_settings.all().update(need_rub=need_rub, need_usd=need_usd, need_eur=need_eur)
+    update.effective_message.reply_text(text="Отлично! Запомнил 😉", reply_markup=ReplyKeyboardRemove())
+    return ConversationHandler.END
 
-    NotifySettings.objects.update_or_create(
-        atm=atm,
-        user=user,
-        defaults=dict(need_rub=need_rub, need_usd=need_usd, need_eur=need_eur),
-    )
 
-    roi = "/".join(["₽$€"[idx] for idx, v in enumerate((need_rub, need_usd, need_eur)) if v])
+SCAN_REQUEST_POS, SCAN_REQUEST_RADIUS = range(2)
+
+
+def scan_handler(update: Update, context: CallbackContext):
     update.effective_message.reply_text(
-        text=f"""
-Отлично! Запомнил 😉
+        text="Укажите локацию с помощью кнопки ниже или введите координаты в виде:"
+        "\n\nширота, долгота\n\nразделитель дробной части в координатах - точка",
+        reply_markup=ReplyKeyboardMarkup(
+            [[KeyboardButton("Мое местоположение", request_location=True)]],
+            resize_keyboard=True,
+            one_time_keyboard=True,
+        ),
+    )
+    return SCAN_REQUEST_POS
 
-Адрес: *{atm.address}*
 
-Интересует: *{roi}*
-        """,
-        reply_markup=ReplyKeyboardRemove(),
-        parse_mode="markdown",
+def set_atms(user: TelegramUser, lon: float, lat: float, radius: float) -> int:
+    ns = user.notify_settings.first()
+    need_rub, need_usd, need_eur = True, True, True
+    if ns:
+        need_rub, need_usd, need_eur = ns.need_rub, ns.need_usd, ns.need_eur
+
+    lon = decimal.Decimal(lon)
+    lat = decimal.Decimal(lat)
+    # https://stackoverflow.com/questions/61135374/postgresql-calculate-distance-between-two-points-without-using-postgis
+    atm_ids = (
+        ATM.objects.annotate(
+            distance=Sqrt(
+                Power(decimal.Decimal(69.1) * (F("lon") - lon) * Cos(lat / decimal.Decimal(57.3)), 2)
+                + Power(decimal.Decimal(69.1) * (F("lat") - lat), 2)
+            )
+        )
+        .filter(distance__lte=radius)
+        .values_list("id", flat=True)
     )
 
-    return ATM_COMMAND
+    user.notify_settings.all().delete()
+    NotifySettings.objects.bulk_create(
+        [
+            NotifySettings(user=user, atm_id=atm_id, need_rub=need_rub, need_usd=need_usd, need_eur=need_eur)
+            for atm_id in atm_ids
+        ],
+        ignore_conflicts=True,
+    )
+    return len(atm_ids)
+
+
+def request_radius(update: Update, context: CallbackContext):
+    update.effective_message.reply_text(
+        text="Укажите радиус поиска, в километрах\n\nразделитель дробной части в координатах - точка"
+    )
+    return SCAN_REQUEST_RADIUS
+
+
+def inline_location_handler(update: Update, context: CallbackContext):
+    context.chat_data["lon"] = update.effective_message.location.longitude
+    context.chat_data["lat"] = update.effective_message.location.latitude
+    return request_radius(update, context)
+
+
+def manual_location_handler(update: Update, context: CallbackContext):
+    lat, lon = update.effective_message.text.split(",")
+    context.chat_data["lon"] = float(lon)
+    context.chat_data["lat"] = float(lat)
+    return request_radius(update, context)
 
 
 @inject_user
-def atm_remove_all_handler(update: Update, context: CallbackContext, user: TelegramUser):
-    if update.effective_message.text.lower() == "да":
-        user.notify_settings.all().delete()
-        update.effective_message.reply_text(
-            text="Готово, приходи, когда надумаешь 😉",
-            reply_markup=ReplyKeyboardRemove(),
-        )
+def radius_handler(update: Update, context: CallbackContext, user: TelegramUser):
+    radius = float(update.effective_message.text)
+    count = set_atms(user, context.chat_data["lon"], context.chat_data["lat"], radius)
+    update.effective_message.reply_text(text=f"Готово, слежение за {count} банкоматом(ами) включено 😉")
+    return ConversationHandler.END
 
-    return ATM_COMMAND
+
+@inject_user
+def stop_handler(update: Update, context: CallbackContext, user: TelegramUser):
+    user.notify_settings.all().delete()
+    update.effective_message.reply_text(text="Готово, больше никаких уведомлений, приходи, когда надумаешь 😉")
 
 
 def configure_bot() -> Updater:
@@ -217,31 +187,35 @@ def configure_bot() -> Updater:
 
     dispatcher.add_handler(CommandHandler("start", start_command))
     dispatcher.add_handler(CommandHandler("help", help_command))
+    dispatcher.add_handler(CommandHandler("payment", payment_handler))
     dispatcher.add_handler(
-        MessageHandler(
-            Filters.regex(re.compile(r"^оплата$", re.IGNORECASE)) & ~Filters.command,
-            payment_handler,
+        ConversationHandler(
+            entry_points=[CommandHandler("currency", currency_handler)],
+            states={
+                CURRENCY_SAVE: [MessageHandler(Filters.text & ~Filters.command, currency_finish_handler)],
+            },
+            fallbacks=[MessageHandler(Filters.all, fallback_exit_handler)],
+            allow_reentry=True,
         )
     )
     dispatcher.add_handler(
         ConversationHandler(
-            entry_points=[
-                MessageHandler(
-                    Filters.regex(re.compile(r"^банкоматы?$", re.IGNORECASE)) & ~Filters.command,
-                    atm_start_handler,
-                )
-            ],
+            entry_points=[CommandHandler("scan", scan_handler)],
             states={
-                ATM_COMMAND: [MessageHandler(Filters.text & ~Filters.command, atm_command_handler)],
-                ATM_ADD: [MessageHandler(Filters.text & ~Filters.command, atm_add_handler)],
-                ATM_CONFIGURE: [MessageHandler(Filters.text & ~Filters.command, atm_configure_handler)],
-                ATM_CONFIGURE_FINISH: [MessageHandler(Filters.text & ~Filters.command, atm_configure_finish_handler)],
-                ATM_REMOVE_ALL: [MessageHandler(Filters.text & ~Filters.command, atm_remove_all_handler)],
+                SCAN_REQUEST_POS: [
+                    MessageHandler(Filters.location, inline_location_handler, pass_user_data=True),
+                    MessageHandler(
+                        Filters.regex(r"^\d+\.?\d*\s*,\s*\d+\.?\d*$") & ~Filters.command,
+                        manual_location_handler,
+                    ),
+                ],
+                SCAN_REQUEST_RADIUS: [MessageHandler(Filters.regex(r"^\d+\.?\d*$") & ~Filters.command, radius_handler)],
             },
-            fallbacks=[],
+            fallbacks=[MessageHandler(Filters.all, fallback_exit_handler)],
             allow_reentry=True,
         )
     )
+    dispatcher.add_handler(CommandHandler("stop", stop_handler))
     dispatcher.add_handler(MessageHandler(Filters.all, help_command))
 
     return updater
