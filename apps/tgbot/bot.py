@@ -3,25 +3,12 @@ import logging
 import re
 
 from django.conf import settings
-from telegram import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    KeyboardButton,
-    ReplyKeyboardMarkup,
-    ReplyKeyboardRemove,
-    Update,
-)
-from telegram.ext import (
-    CallbackContext,
-    CallbackQueryHandler,
-    CommandHandler,
-    ConversationHandler,
-    Filters,
-    MessageHandler,
-    Updater,
-)
+from django.urls import reverse
+from telegram import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
+from telegram.ext import CallbackContext, CommandHandler, ConversationHandler, Filters, MessageHandler, Updater
 
-from apps.tgbot.models import TelegramUser
+from apps.monitor.models import ATM
+from apps.tgbot.models import NotifySettings, TelegramUser
 
 logger = logging.getLogger(__name__)
 
@@ -70,18 +57,19 @@ def payment_handler(update: Update, context: CallbackContext, user: TelegramUser
             reply_markup=ReplyKeyboardRemove(),
         )
     else:
+        payment_link = settings.APP_BASE_URL + reverse("payment", kwargs=dict(tuid=user.id))
         update.effective_message.reply_text(
-            text="Ссылка на оплату: https://yandex.ru\n\nПосле оплаты я начну следить за деньгами для тебя 😉",
+            text=f"Ссылка на оплату:\n{payment_link}\n\nПосле оплаты я начну следить за деньгами для тебя 😉",
             reply_markup=ReplyKeyboardRemove(),
         )
 
 
-ATM_COMMAND, ATM_ADD, ATM_CONFIGURE, ATM_REMOVE, ATM_REMOVE_ALL = range(5)
+ATM_COMMAND, ATM_ADD, ATM_CONFIGURE, ATM_CONFIGURE_FINISH, ATM_REMOVE, ATM_REMOVE_ALL = range(6)
 ATM_COMMANDS_TEXT = {
-    ATM_ADD: "Добавить банкомат",
-    ATM_CONFIGURE: "Настроить банкомат",
-    ATM_REMOVE: "Удалить банкомат",
-    ATM_REMOVE_ALL: "Удалить все",
+    ATM_ADD: "Добавить/изменить банкомат",
+    # ATM_CONFIGURE: "Настроить банкомат",
+    # ATM_REMOVE: "Удалить банкомат",
+    ATM_REMOVE_ALL: "Отписаться от всех уведомлений",
 }
 ATM_TEXT_COMMAND = {v: k for k, v in ATM_COMMANDS_TEXT.items()}
 
@@ -90,8 +78,8 @@ ATM_TEXT_COMMAND = {v: k for k, v in ATM_COMMANDS_TEXT.items()}
 def atm_start_handler(update: Update, context: CallbackContext, user: TelegramUser):
     choices = ReplyKeyboardMarkup(
         [
-            [KeyboardButton(ATM_COMMANDS_TEXT[ATM_ADD]), KeyboardButton(ATM_COMMANDS_TEXT[ATM_CONFIGURE])],
-            [KeyboardButton(ATM_COMMANDS_TEXT[ATM_REMOVE]), KeyboardButton(ATM_COMMANDS_TEXT[ATM_REMOVE_ALL])],
+            [KeyboardButton(ATM_COMMANDS_TEXT[ATM_ADD])],
+            [KeyboardButton(ATM_COMMANDS_TEXT[ATM_REMOVE_ALL])],
         ],
         resize_keyboard=True,
         one_time_keyboard=True,
@@ -112,98 +100,115 @@ def atm_command_handler(update: Update, context: CallbackContext, user: Telegram
         return atm_start_handler(update, context)
 
     message = {
-        ATM_ADD: "по какому адресу интересует банкомат?",
-        ATM_CONFIGURE: "ATM_CONFIGURE",
-        ATM_REMOVE: "ATM_REMOVE",
-        ATM_REMOVE_ALL: "ATM_REMOVE_ALL",
+        ATM_ADD: dict(
+            text="По какому адресу интересует банкомат? Мне будет проще понять тебя, если ты введешь адрес"
+            " (или его часть) как на официальной карте Тинькофф: https://www.tinkoff.ru/maps/atm/",
+            reply_markup=ReplyKeyboardRemove(),
+        ),
+        # ATM_CONFIGURE: "ATM_CONFIGURE",
+        # ATM_REMOVE: "ATM_REMOVE",
+        ATM_REMOVE_ALL: dict(
+            text="Точно хочешь отписаться от всех уведомлений?",
+            reply_markup=ReplyKeyboardMarkup(
+                [["Да", "Нет"]],
+                resize_keyboard=True,
+                one_time_keyboard=True,
+            ),
+        ),
     }[command]
-    update.effective_message.reply_text(text=message, reply_markup=ReplyKeyboardRemove())
+    update.effective_message.reply_text(**message)
     return command
 
 
 @inject_user
 def atm_add_handler(update: Update, context: CallbackContext, user: TelegramUser):
-    try:
-        record_id = int(update.effective_message.text.split()[0].lstrip("/review"))
-        record = Record.objects.exclude(status=Record.Status.CANCELLED).get(id=record_id)
-        client_phone_number = TelegramUser.objects.get(id=update.effective_message.from_user.id).phone_number
-        if record.client_phone_number != client_phone_number:
-            raise ValueError("not authenticated")
-    except Exception as ex:
-        logger.exception(ex)
+    atms = ATM.objects.filter(address__icontains=update.effective_message.text).values_list("address", flat=True)[:5]
+
+    if not atms:
+        update.effective_message.reply_text(text="Ничего похожего не нахожу... Может другой адрес?")
+        return atm_command_handler(update, context)
+
+    choices = ReplyKeyboardMarkup(
+        [[KeyboardButton(atm)] for atm in atms],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
+
+    update.effective_message.reply_text(
+        text="Что-то из этого?",
+        reply_markup=choices,
+    )
+
+    return ATM_CONFIGURE
+
+
+@inject_user
+def atm_configure_handler(update: Update, context: CallbackContext, user: TelegramUser):
+    atm = ATM.objects.filter(address=update.effective_message.text).first()
+    if not atm:
+        return atm_command_handler(update, context)
+
+    context.chat_data["atm"] = atm.id
+    choices = ReplyKeyboardMarkup(
+        [
+            ["рубли ₽", "доллары $", "евро €"],
+            ["доллары и евро $/€", "все ₽/$/€"],
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
+
+    update.effective_message.reply_text(
+        text="Какая валюта интересует?",
+        reply_markup=choices,
+    )
+
+    return ATM_CONFIGURE_FINISH
+
+
+@inject_user
+def atm_configure_finish_handler(update: Update, context: CallbackContext, user: TelegramUser):
+    atm = ATM.objects.filter(id=context.chat_data["atm"]).first()
+    if not atm:
+        update.effective_message.reply_text(text="Что-то сломалось... Надо начать сначала")
+        return atm_command_handler(update, context)
+
+    need_rub = "₽" in update.effective_message.text
+    need_usd = "$" in update.effective_message.text
+    need_eur = "€" in update.effective_message.text
+
+    NotifySettings.objects.update_or_create(
+        atm=atm,
+        user=user,
+        defaults=dict(need_rub=need_rub, need_usd=need_usd, need_eur=need_eur),
+    )
+
+    roi = "/".join(["₽$€"[idx] for idx, v in enumerate((need_rub, need_usd, need_eur)) if v])
+    update.effective_message.reply_text(
+        text=f"""
+Отлично! Запомнил 😉
+
+Адрес: *{atm.address}*
+
+Интересует: *{roi}*
+        """,
+        reply_markup=ReplyKeyboardRemove(),
+        parse_mode="markdown",
+    )
+
+    return ATM_COMMAND
+
+
+@inject_user
+def atm_remove_all_handler(update: Update, context: CallbackContext, user: TelegramUser):
+    if update.effective_message.text.lower() == "да":
+        user.notify_settings.all().delete()
         update.effective_message.reply_text(
-            "К сожалению, что-то пошло не так :(",
+            text="Готово, приходи, когда надумаешь 😉",
             reply_markup=ReplyKeyboardRemove(),
         )
-        return ConversationHandler.END
 
-    if Review.objects.filter(record=record).exists():
-        update.effective_message.reply_text(
-            "Вы уже оставляли отзыв по данному посещению",
-            reply_markup=ReplyKeyboardRemove(),
-        )
-        return ConversationHandler.END
-
-    context.chat_data["review_record_id"] = record_id
-    update.effective_message.reply_text(
-        "Напишите свои впечатления текстом",
-        reply_markup=ReplyKeyboardRemove(),
-    )
-    return REVIEW_TEXT
-
-
-def review_text(update: Update, context: CallbackContext, record_id: int):
-    context.chat_data["review_text"] = update.effective_message.text
-    update.effective_message.reply_text(
-        "Укажите оценку от 1 до 5",
-        reply_markup=ReplyKeyboardMarkup(
-            [["1", "2", "3", "4", "5"]],
-            resize_keyboard=True,
-            one_time_keyboard=True,
-        ),
-    )
-    return REVIEW_RATING
-
-
-def review_rating(update: Update, context: CallbackContext, record_id: int):
-    rating = int(update.effective_message.text)
-    if rating < 1 or rating > 5:
-        update.effective_message.reply_text(
-            "Оценка должна быть в диапазоне от 1 до 5",
-            reply_markup=ReplyKeyboardMarkup(
-                [["1", "2", "3", "4", "5"]],
-                resize_keyboard=True,
-                one_time_keyboard=True,
-            ),
-        )
-        return REVIEW_RATING
-
-    text = context.chat_data["review_text"]
-    record = Record.objects.get(id=record_id)
-    services_ids = record.services.values_list("id", flat=True)
-    Review.objects.create(
-        master_id=record.master_id,
-        service_id=services_ids[0] if len(services_ids) == 1 else None,
-        record=record,
-        text=text,
-        rating=rating,
-    )
-
-    update.effective_message.reply_text(
-        "Спасибо за ваш отзыв!",
-        reply_markup=ReplyKeyboardRemove(),
-    )
-    return ConversationHandler.END
-
-
-def review_fallback(update: Update, context: CallbackContext, record_id: int):
-    update.effective_message.reply_text(
-        "Вы отменили отзыв по услуге. "
-        "Если позднее решите снова оставить его - "
-        f"используйте команду /review{record_id}",
-        reply_markup=ReplyKeyboardRemove(),
-    )
-    return ConversationHandler.END
+    return ATM_COMMAND
 
 
 def configure_bot() -> Updater:
@@ -229,16 +234,12 @@ def configure_bot() -> Updater:
             states={
                 ATM_COMMAND: [MessageHandler(Filters.text & ~Filters.command, atm_command_handler)],
                 ATM_ADD: [MessageHandler(Filters.text & ~Filters.command, atm_add_handler)],
-                ATM_CONFIGURE: [MessageHandler(Filters.text & ~Filters.command, review_text)],
-                ATM_REMOVE: [MessageHandler(Filters.text & ~Filters.command, review_text)],
-                ATM_REMOVE_ALL: [MessageHandler(Filters.text & ~Filters.command, review_text)],
-                # REVIEW_RATING: [MessageHandler(Filters.regex(r"^\d+$") & ~Filters.command, review_rating)],
+                ATM_CONFIGURE: [MessageHandler(Filters.text & ~Filters.command, atm_configure_handler)],
+                ATM_CONFIGURE_FINISH: [MessageHandler(Filters.text & ~Filters.command, atm_configure_finish_handler)],
+                ATM_REMOVE_ALL: [MessageHandler(Filters.text & ~Filters.command, atm_remove_all_handler)],
             },
-            fallbacks=[
-                # MessageHandler(Filters.text, atm_fallback)
-            ],
+            fallbacks=[],
             allow_reentry=True,
-            # per_message=True,
         )
     )
     dispatcher.add_handler(MessageHandler(Filters.all, help_command))

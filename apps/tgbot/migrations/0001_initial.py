@@ -3,7 +3,7 @@
 import django.db.models.deletion
 from django.db import migrations, models
 
-import apps.tgbot.drf_json_encoder
+import apps.drf_json_encoder
 
 
 class Migration(migrations.Migration):
@@ -36,7 +36,7 @@ class Migration(migrations.Migration):
                 ("id", models.CharField(max_length=32, primary_key=True, serialize=False)),
                 (
                     "extra_data",
-                    models.JSONField(blank=True, encoder=apps.tgbot.drf_json_encoder.JSONEncoder, null=True),
+                    models.JSONField(blank=True, encoder=apps.drf_json_encoder.JSONEncoder, null=True),
                 ),
                 ("has_subscription", models.BooleanField(default=False)),
                 (

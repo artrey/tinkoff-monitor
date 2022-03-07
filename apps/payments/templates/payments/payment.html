@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Оплата</title>
+  <link rel="apple-touch-icon" sizes="76x76"
+        href="https://acdn.tinkoff.ru/params/common_front/resourses/icons/apple-touch-icon-76x76.png">
+  <link rel="apple-touch-icon" sizes="120x120"
+        href="https://acdn.tinkoff.ru/params/common_front/resourses/icons/apple-touch-icon-120x120.png">
+  <link rel="apple-touch-icon" sizes="152x152"
+        href="https://acdn.tinkoff.ru/params/common_front/resourses/icons/apple-touch-icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="180x180"
+        href="https://acdn.tinkoff.ru/params/common_front/resourses/icons/apple-touch-icon-180x180.png">
+  <link rel="shortcut icon" sizes="32x32"
+        href="https://acdn.tinkoff.ru/params/common_front/resourses/icons/favicon-32x32.png">
+  <style>
+    form {
+      margin: 1em auto;
+      width: 240px;
+    }
+
+    button {
+      font-size: 2em;
+      margin-top: 0.5em;
+      position: relative;
+      display: inline-block;
+      text-overflow: ellipsis;
+      vertical-align: top;
+      background: #ffdb4d;
+      padding: 0.1em 0.3em;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      color: #000;
+      border: 0;
+      cursor: pointer;
+      border-radius: 3px;
+      outline: 0;
+      text-align: center;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+    }
+
+    label {
+      margin: 0.4em 0;
+      font-size: 1.2em;
+    }
+
+    div {
+      display: flex;
+      flex-direction: column;
+    }
+  </style>
+</head>
+<body>
+
+<form method="POST" action="https://yoomoney.ru/quickpay/confirm.xml">
+  <input type="hidden" name="receiver" value="410011481072133"/>
+
+  <input type="hidden" name="formcomment" value="Подписка на бота"/>
+  <input type="hidden" name="short-dest" value="Подписка на бота"/>
+  <input type="hidden" name="comment" value="Подписка на бота"/>
+
+  <input type="hidden" name="label" value="{{ user.id }}"/>
+  <input type="hidden" name="quickpay-form" value="donate"/>
+  <input type="hidden" name="targets" value="Мониторинг банкоматов"/>
+  <input type="hidden" name="sum" value="100" data-type="number"/>
+  <input type="hidden" name="need-fio" value="false"/>
+  <input type="hidden" name="need-email" value="false"/>
+  <input type="hidden" name="need-phone" value="false"/>
+  <input type="hidden" name="need-address" value="false"/>
+
+  <input type="hidden" name="successURL" value="https://t.me/TinkMonitorBot"/>
+
+  <div>
+    <label><input type="radio" name="paymentType" value="PC" checked/>ЮMoney</label>
+    <label><input type="radio" name="paymentType" value="AC"/>Банковской картой</label>
+    <button type="submit">Оплатить</button>
+  </div>
+</form>
+
+</body>
+</html>

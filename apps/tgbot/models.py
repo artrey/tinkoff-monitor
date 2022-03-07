@@ -1,7 +1,7 @@
 from django.db import models
 
+from apps.drf_json_encoder import JSONEncoder
 from apps.monitor.models import ATM
-from apps.tgbot.drf_json_encoder import JSONEncoder
 
 
 class TelegramUser(models.Model):

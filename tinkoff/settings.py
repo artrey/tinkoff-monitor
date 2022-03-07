@@ -49,6 +49,7 @@ LOCAL_APPS = [
     "apps.monitor",
     "apps.tgbot",
     "apps.tasks",
+    "apps.payments",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -150,6 +151,8 @@ CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://127.0.0.1:63
 CELERY_BEAT_SCHEDULE = {}
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+YOOMONEY_NOTIFICATION_SECRET = os.getenv("YOOMONEY_NOTIFICATION_SECRET")
+APP_BASE_URL = os.getenv("APP_BASE_URL")
 
 if DEBUG:
     LOGGING = {
