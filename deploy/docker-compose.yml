@@ -55,17 +55,17 @@ services:
       - private
     command: "celery -A tinkoff worker --loglevel error --pool=solo"
 
-#  beat:
-#    image: ghcr.io/artrey/tinkoff-monitor:latest
-#    restart: unless-stopped
-#    env_file:
-#      - .env
-#    depends_on:
-#      - postgres
-#      - redis
-#    networks:
-#      - private
-#    command: "celery -A tinkoff beat"
+  scanning_initiator:
+    image: ghcr.io/artrey/tinkoff-monitor:latest
+    restart: on-failure
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - private
+    command: "python manage.py grab_atms"
 
   bot:
     image: ghcr.io/artrey/tinkoff-monitor:latest
