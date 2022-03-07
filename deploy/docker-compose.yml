@@ -67,17 +67,17 @@ services:
 #      - private
 #    command: "celery -A tinkoff beat"
 
-#  bot:
-#    image: ghcr.io/artrey/tinkoff-monitor:latest
-#    restart: unless-stopped
-#    env_file:
-#      - .env
-#    depends_on:
-#      - postgres
-#      - redis
-#    networks:
-#      - private
-#    command: "python manage.py start_bot"
+  bot:
+    image: ghcr.io/artrey/tinkoff-monitor:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - private
+    command: "python manage.py start_bot"
 
   nginx:
     image: nginx:stable-alpine

@@ -15,11 +15,12 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from django.views.decorators.csrf import csrf_exempt
 
 from apps.payments.views import YoomoneyNotificationView, payment_view
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("payment/notification/", YoomoneyNotificationView.as_view(), name="payment-notification"),
+    path("payment/notification/", csrf_exempt(YoomoneyNotificationView.as_view()), name="payment-notification"),
     path("payment/<str:tuid>/", payment_view, name="payment"),
 ]
