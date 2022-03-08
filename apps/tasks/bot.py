@@ -59,7 +59,7 @@ def send_atm_info(atm_id: int, changed_rub: bool, changed_usd: bool, changed_eur
 *RUB:* {message_threshold(atm.last_info.rub, 300000)} ₽
 *USD:* {message_threshold(atm.last_info.usd, 5000)} $
 *EUR:* {message_threshold(atm.last_info.eur, 5000)} €
-    """
+    """  # noqa: E501
 
     for tid, need_rub, need_usd, need_eur in info:
         if need_rub and changed_rub or need_usd and changed_usd or need_eur and changed_eur:
