@@ -7,7 +7,7 @@ from apps.monitor.models import ATM
 class TelegramUser(models.Model):
     id = models.CharField(max_length=32, primary_key=True)
     extra_data = models.JSONField(encoder=JSONEncoder, null=True, blank=True)
-    has_subscription = models.BooleanField(default=False)
+    has_subscription = models.BooleanField(default=True)
     atms = models.ManyToManyField(ATM, related_name="subscribers", through="NotifySettings")
 
     def __str__(self) -> str:

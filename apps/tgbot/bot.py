@@ -148,9 +148,7 @@ def set_atms(user: TelegramUser, lon: float, lat: float, radius: float) -> int:
 
 
 def request_radius(update: Update, context: CallbackContext):
-    update.effective_message.reply_text(
-        text="Укажите радиус поиска, в километрах\n\nразделитель дробной части в координатах - точка"
-    )
+    update.effective_message.reply_text(text="Укажите радиус поиска, в километрах\n\nразделитель дробной части - точка")
     return SCAN_REQUEST_RADIUS
 
 

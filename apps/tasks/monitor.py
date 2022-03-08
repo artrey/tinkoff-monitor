@@ -19,9 +19,12 @@ def grab_info(atm_id: int):
         logger.warning("error while getting info")
         return
 
-    if info.rub != atm.last_info.rub or info.usd != atm.last_info.usd or info.eur != atm.last_info.eur:
+    changed_rub = info.rub != atm.last_info.rub
+    changed_usd = info.usd != atm.last_info.usd
+    changed_eur = info.eur != atm.last_info.eur
+    if changed_rub or changed_usd or changed_eur:
         atm.update_currencies(rub=info.rub, usd=info.usd, eur=info.eur)
-        send_atm_info(atm.id)
+        send_atm_info(atm.id, changed_rub, changed_usd, changed_eur)
     else:
         atm.last_info.save(update_fields=["updated_at"])
 

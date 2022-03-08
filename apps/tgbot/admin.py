@@ -12,6 +12,7 @@ class NotifySettingsInline(admin.TabularInline):
 @admin.register(TelegramUser)
 class TelegramUserAdmin(admin.ModelAdmin):
     list_display = ["id", "has_subscription", "atm_count", "extra_data"]
+    search_fields = ["id", "extra_data__username"]
     inlines = [NotifySettingsInline]
 
     def get_queryset(self, request):
@@ -27,3 +28,4 @@ class TelegramUserAdmin(admin.ModelAdmin):
 class NotifySettingsAdmin(admin.ModelAdmin):
     list_display = ["atm", "user", "need_rub", "need_usd", "need_eur"]
     list_select_related = ["atm", "user"]
+    search_fields = ["user__id", "user__extra_data__username", "atm__address"]
