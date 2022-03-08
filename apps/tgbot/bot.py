@@ -1,6 +1,7 @@
 import decimal
 import functools
 import logging
+import re
 
 from django.conf import settings
 from django.db.models import F
@@ -148,7 +149,14 @@ def set_atms(user: TelegramUser, lon: float, lat: float, radius: float) -> int:
 
 
 def request_radius(update: Update, context: CallbackContext):
-    update.effective_message.reply_text(text="Укажите радиус поиска, в километрах\n\nразделитель дробной части - точка")
+    update.effective_message.reply_text(
+        text="Укажите радиус поиска, в километрах\n\nразделитель дробной части - точка",
+        reply_markup=ReplyKeyboardMarkup(
+            [[KeyboardButton(f"{v} км") for v in (0.5, 1, 2, 3)]],
+            resize_keyboard=True,
+            one_time_keyboard=True,
+        ),
+    )
     return SCAN_REQUEST_RADIUS
 
 
@@ -167,7 +175,7 @@ def manual_location_handler(update: Update, context: CallbackContext):
 
 @inject_user
 def radius_handler(update: Update, context: CallbackContext, user: TelegramUser):
-    radius = float(update.effective_message.text)
+    radius = float(update.effective_message.text.rstrip("км"))
     count = set_atms(user, context.chat_data["lon"], context.chat_data["lat"], radius)
     update.effective_message.reply_text(text=f"Готово, слежение за {count} банкоматом(ами) включено 😉")
     return ConversationHandler.END
@@ -207,7 +215,12 @@ def configure_bot() -> Updater:
                         manual_location_handler,
                     ),
                 ],
-                SCAN_REQUEST_RADIUS: [MessageHandler(Filters.regex(r"^\d+\.?\d*$") & ~Filters.command, radius_handler)],
+                SCAN_REQUEST_RADIUS: [
+                    MessageHandler(
+                        Filters.regex(re.compile(r"^\d+\.?\d*\s*(км)?$", re.IGNORECASE)) & ~Filters.command,
+                        radius_handler,
+                    ),
+                ],
             },
             fallbacks=[MessageHandler(Filters.all, fallback_exit_handler)],
             allow_reentry=True,
