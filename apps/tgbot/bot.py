@@ -177,7 +177,10 @@ def manual_location_handler(update: Update, context: CallbackContext):
 def radius_handler(update: Update, context: CallbackContext, user: TelegramUser):
     radius = float(update.effective_message.text.rstrip("км"))
     count = set_atms(user, context.chat_data["lon"], context.chat_data["lat"], radius)
-    update.effective_message.reply_text(text=f"Готово, слежение за {count} банкоматом(ами) включено 😉")
+    update.effective_message.reply_text(
+        text=f"Готово, слежение за {count} банкоматом(ами) включено 😉",
+        reply_markup=ReplyKeyboardRemove(),
+    )
     return ConversationHandler.END
 
 
