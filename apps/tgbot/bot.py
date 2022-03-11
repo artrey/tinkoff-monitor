@@ -134,7 +134,7 @@ def set_atms(user: TelegramUser, lon: float, lat: float, radius: float) -> int:
             )
         )
         .filter(distance__lte=radius)
-        .values_list("id", flat=True)
+        .values_list("id", flat=True)[: settings.MAX_ATMS_PER_USER]
     )
 
     user.notify_settings.all().delete()
