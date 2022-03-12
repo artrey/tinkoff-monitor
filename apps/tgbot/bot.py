@@ -78,6 +78,12 @@ def atms_handler(update: Update, context: CallbackContext, user: TelegramUser):
         )
 
 
+def thanks_handler(update: Update, context: CallbackContext):
+    update.effective_message.reply_text(
+        text="Ссылка на страничку с поддержкой автора:\nhttps://yoomoney.ru/to/410011481072133\n\nСпасибо!",
+    )
+
+
 def fallback_exit_handler(update: Update, context: CallbackContext):
     update.effective_message.reply_text(text="Что-то не получилось... Попробуйте повторить с начала")
     return ConversationHandler.END
@@ -214,6 +220,7 @@ def configure_bot() -> Updater:
     dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(CommandHandler("payment", payment_handler))
     dispatcher.add_handler(CommandHandler("atms", atms_handler))
+    dispatcher.add_handler(CommandHandler("thanks", thanks_handler))
     dispatcher.add_handler(
         ConversationHandler(
             entry_points=[CommandHandler("currency", currency_handler)],
