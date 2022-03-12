@@ -19,6 +19,9 @@ def message_threshold(value: int, threshold: int) -> str:
 
 
 class ATM(models.Model):
+    class Meta:
+        ordering = ["-last_info__updated_at"]
+
     address = models.TextField()
     worktime = models.CharField(max_length=256)
     lon = models.DecimalField(max_digits=18, decimal_places=15)
