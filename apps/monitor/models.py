@@ -6,6 +6,18 @@ from django.dispatch import receiver
 from django.utils import timezone
 
 
+def money2str(value: int) -> str:
+    if value >= 1000:
+        return f"{value // 1000} {value % 1000:03}"
+    return str(value)
+
+
+def message_threshold(value: int, threshold: int) -> str:
+    if value >= threshold:
+        return f"более {money2str(threshold)}"
+    return money2str(value)
+
+
 class ATM(models.Model):
     address = models.TextField()
     worktime = models.CharField(max_length=256)
@@ -15,6 +27,20 @@ class ATM(models.Model):
     def update_currencies(self, rub: int, usd: int, eur: int):
         ATMLastInfo.objects.filter(atm_id=self.id).update(rub=rub, usd=usd, eur=eur, updated_at=timezone.now())
         ATMHistoryInfo.objects.create(atm_id=self.id, rub=rub, usd=usd, eur=eur)
+
+    @property
+    def info_message_markdown(self) -> str:
+        return f"""
+*{self.address}*
+
+*Время работы:* {self.worktime}
+
+[Смотреть на карте](https://www.tinkoff.ru/maps/atm/?latitude={self.lat.normalize()}&longitude={self.lon.normalize()}&zoom=16&partner=tcs)
+
+*RUB:* {message_threshold(self.last_info.rub, 300000)} ₽
+*USD:* {message_threshold(self.last_info.usd, 5000)} $
+*EUR:* {message_threshold(self.last_info.eur, 5000)} €
+        """  # noqa: E501
 
     def __str__(self) -> str:
         return f"{self.id} | {self.address}"

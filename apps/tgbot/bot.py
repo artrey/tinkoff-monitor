@@ -62,6 +62,16 @@ def payment_handler(update: Update, context: CallbackContext, user: TelegramUser
         )
 
 
+@inject_user
+def atms_handler(update: Update, context: CallbackContext, user: TelegramUser):
+    for atm in user.atms.select_related("last_info").all():
+        update.effective_message.reply_text(
+            text=atm.info_message_markdown,
+            parse_mode="markdown",
+            disable_web_page_preview=True,
+        )
+
+
 def fallback_exit_handler(update: Update, context: CallbackContext):
     update.effective_message.reply_text(text="Что-то не получилось... Попробуйте повторить с начала")
     return ConversationHandler.END
@@ -197,6 +207,7 @@ def configure_bot() -> Updater:
     dispatcher.add_handler(CommandHandler("start", start_command))
     dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(CommandHandler("payment", payment_handler))
+    dispatcher.add_handler(CommandHandler("atms", atms_handler))
     dispatcher.add_handler(
         ConversationHandler(
             entry_points=[CommandHandler("currency", currency_handler)],
