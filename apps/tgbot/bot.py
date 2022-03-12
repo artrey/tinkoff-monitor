@@ -64,7 +64,13 @@ def payment_handler(update: Update, context: CallbackContext, user: TelegramUser
 
 @inject_user
 def atms_handler(update: Update, context: CallbackContext, user: TelegramUser):
-    for atm in user.atms.select_related("last_info").all():
+    atms = list(user.atms.select_related("last_info").all())
+    if not atms:
+        update.effective_message.reply_text(
+            text="Пока не выбран ни один банкомат. Используй команду /scan, чтобы добавить банкоматы 😉"
+        )
+        return
+    for atm in atms:
         update.effective_message.reply_text(
             text=atm.info_message_markdown,
             parse_mode="markdown",
