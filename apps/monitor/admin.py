@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.db.models import Count
+from django.utils.safestring import mark_safe
 
 from apps.monitor.models import ATM, ATMHistoryInfo, ATMLastInfo
 from apps.tgbot.models import NotifySettings
@@ -26,15 +27,24 @@ class NotifySettingsInline(admin.TabularInline):
 
 @admin.register(ATM)
 class ATMAdmin(admin.ModelAdmin):
-    list_display = ["id", "address", "rub", "usd", "eur", "updated_at", "subscribers_count"]
+    list_display = ["id", "address", "on_map", "rub", "usd", "eur", "updated_at", "subscribers_count"]
     list_display_links = ["id", "address"]
     list_select_related = ["last_info"]
     search_fields = ["address"]
+    readonly_fields = ["on_map"]
     inlines = [ATMLastInfoInline, NotifySettingsInline, ATMHistoryInfoInline]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.annotate(subscribers_count=Count("subscribers"))
+
+    @admin.display
+    def on_map(self, obj: ATM):
+        return mark_safe(
+            "<a target='_blank' rel='noopener noreferrer' href='https://www.tinkoff.ru/maps/atm/?"
+            f"latitude={obj.lat.normalize()}&longitude={obj.lon.normalize()}&zoom=16&partner=tcs'>"
+            f"На карте</a>"
+        )
 
     @admin.display(description="rub", ordering="last_info__rub")
     def rub(self, obj: ATM):
